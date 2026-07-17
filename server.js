@@ -243,6 +243,24 @@ app.post('/api/supprimer', verifierAuthentification, async (req, res) => {
   } catch (err) { res.status(500).json({ succes: false, erreur: err.message }); }
 });
 
+// Copier un fichier déposé (Drag & Drop)
+app.post('/api/fichier/copier-depot', verifierAuthentification, async (req, res) => {
+  const { chemin, contenu } = req.body;
+  try {
+    // Utilise la même logique 'printf' sécurisée que pour la sauvegarde
+    const commande = `printf '%s' "${contenu.replace(/"/g, '\\"')}" > "${chemin}"`;
+    
+    // On exécute la commande via SSH
+    ssh.connexion.exec(commande, (err, stream) => {
+        if (err) return res.status(500).json({ succes: false, erreur: err.message });
+        stream.on('close', (code) => {
+            if (code === 0) res.json({ succes: true });
+            else res.status(500).json({ succes: false, erreur: "Erreur de copie" });
+        });
+    });
+  } catch (err) { res.status(500).json({ succes: false, erreur: err.message }); }
+});
+
 // ==========================================
 // GESTION DU TERMINAL VIA SSH (SOCKET.IO)
 // ==========================================
