@@ -468,6 +468,44 @@
             }
         }
 
+        // --- GESTION DU GLISSER-DÉPOSER ---
+const zoneFichiers = document.getElementById('zone-fichiers');
+
+zoneFichiers.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    zoneFichiers.style.background = '#2d2d30'; // Effet visuel au survol
+});
+
+zoneFichiers.addEventListener('dragleave', () => {
+    zoneFichiers.style.background = 'transparent';
+});
+
+zoneFichiers.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    zoneFichiers.style.background = 'transparent';
+    
+    const files = e.dataTransfer.files;
+    for (let file of files) {
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const contenu = event.target.result;
+            const cheminDest = `${cheminActuel}/${file.name}`;
+            
+            // On envoie le contenu du fichier au serveur
+            const res = await fetch('/api/fichier/copier-depot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chemin: cheminDest, contenu })
+            });
+            const data = await res.json();
+            if(data.succes) {
+                alert(`Fichier ${file.name} copié avec succès !`);
+                chargerDossier(cheminActuel);
+            }
+        };
+        reader.readAsText(file); // Note : fonctionne très bien pour les fichiers texte/code
+    }
+});
         // Démarrage
         chargerDossier();
     </script>
