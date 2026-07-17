@@ -47,15 +47,26 @@ class ServeurDistant {
   }
 
   // 1. Lister le contenu d'un dossier
+// 1. Lister le contenu d'un dossier via commande shell (beaucoup plus fiable)
   listerDossier(cheminDistant) {
     return new Promise((resolve, reject) => {
-      this.connexion.sftp((err, sftp) => {
+      // On utilise 'ls -p' pour lister les dossiers avec un '/' à la fin
+      this.connexion.exec(`ls -p "${cheminDistant}"`, (err, stream) => {
         if (err) return reject(err);
-        sftp.readdir(cheminDistant, (err, liste) => {
-          if (err) return reject(err);
-          const resultat = liste.map(f => {
-            const estDossier = f.longname.startsWith('d');
-            return { nom: f.filename, estDossier: estDossier, taille: f.attrs.size };
+        
+        let donnees = '';
+        stream.on('data', (data) => { donnees += data; });
+        stream.on('close', (code) => {
+          if (code !== 0) return reject(new Error("Erreur lors de la liste des fichiers"));
+          
+          // On transforme la chaîne de caractères brute en tableau JSON
+          const liste = donnees.split('\n').filter(n => n.length > 0);
+          const resultat = liste.map(nom => {
+            const estDossier = nom.endsWith('/');
+            return { 
+              nom: estDossier ? nom.slice(0, -1) : nom, 
+              estDossier: estDossier 
+            };
           });
           resolve(resultat);
         });
