@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Dashboard Fedora</title>
+    <!-- CSS de Xterm.js pour le look et le style du terminal en direct -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+    <style>
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #1e1e1e;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        h1 { margin: 0; font-size: 24px; color: #007acc; }
+        .logout-btn {
+            background: #ff4757;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        /* Barre d'actions */
+        .actions-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .btn {
+            background: #2d2d2d;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn:hover { background: #3d3d3d; border-color: #007acc; }
+        .btn-primary { background: #007acc; border: none; }
+        .btn-primary:hover { background: #005999; }
+
+        /* Chemin d'accès */
+        .path-bar {
+            background: #2d2d2d;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .back-btn {
+            background: #007acc;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .back-btn:disabled { background: #555; cursor: not-allowed; }
+
+        /* Liste des fichiers */
+        .file-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px; /* Ajout d'une marge sous les fichiers */
+        }
+        .item {
+            background: #252526;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+            user-select: none;
+        }
+        .item:hover {
+            background: #2d2d30;
+            transform: translateY(-2px);
+            border-color: #007acc;
+        }
+        .icon { font-size: 40px; margin-bottom: 10px; }
+        .name {
+            font-size: 13px;
+            word-break: break-all;
+            height: 36px;       /* Hauteur fixe pour que toutes les cartes fassent la même taille */
+            overflow: hidden;   /* Coupe le texte qui dépasse */
+            text-overflow: ellipsis; /* Ajoute des "..." si le texte est trop long sur une seule ligne */
+            display: block;
+    
+            /* Si tu veux forcer le support du retour à la ligne propre sur 2 lignes : */
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        .delete-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(255, 71, 87, 0.2);
+            color: #ff4757;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-weight: bold;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .item:hover .delete-btn { display: flex; }
+        .delete-btn:hover { background: rgba(255, 71, 87, 0.8); color: white; }
+
+        /* SECTION TERMINAL EN DIRECT (Nouveau) */
+        .terminal-section {
+            border-top: 2px solid #333;
+            padding-top: 20px;
+            margin-top: 25px;
+        }
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .terminal-header h2 {
+            margin: 0;
+            font-size: 18px;
+            color: #007acc;
+        }
+        #terminal-container {
+            width: 100%;
+            height: 350px;
+            background: #000;
+            border-radius: 6px;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #333;
+        }
+
+        /* MODALE ÉDITEUR DE TEXTE */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: #1e1e1e;
+            width: 80%;
+            height: 80%;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .modal-title { margin: 0; font-size: 18px; color: #007acc; }
+        .editor-textarea {
+            flex-grow: 1;
+            background: #121212;
+            color: #fff;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            resize: none;
+            outline: none;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>📂 Explorateur de fichiers Fedora</h1>
+            <a href="/logout" class="logout-btn">Se déconnecter</a>
+        </header>
+
+        <!-- Barre d'actions rapides -->
+        <div class="actions-bar">
+            <button class="btn btn-primary" onclick="creerNouveau('fichier')">📄 Nouveau Fichier</button>
+            <button class="btn btn-primary" onclick="creerNouveau('dossier')">📁 Nouveau Dossier</button>
+        </div>
+
+        <!-- Barre de navigation du dossier actuel -->
+        <div class="path-bar">
+            <button id="btn-retour" class="back-btn" onclick="remonter()">⬅ Retour</button>
+            <span id="chemin-actuel">Chargement...</span>
+        </div>
+
+        <!-- Grille des fichiers -->
+        <div id="zone-fichiers" class="file-list"></div>
+
+        <!-- SECTION DU TERMINAL LINUX EN DIRECT (Ajoutée proprement) -->
+        <div class="terminal-section">
+            <div class="terminal-header">
+                <h2>⚡ Console Fedora en direct</h2>
+            </div>
+            <div id="terminal-container"></div>
+        </div>
+    </div>
+
+    <!-- MODALE DE L'ÉDITEUR DE TEXTE -->
+    <div id="modal-editeur" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="editeur-titre" class="modal-title">Éditeur de texte</h3>
+                <button class="btn" onclick="fermerEditeur()">Fermer</button>
+            </div>
+            <textarea id="editeur-texte" class="editor-textarea"></textarea>
+            <div class="modal-footer">
+                <button class="btn" onclick="fermerEditeur()">Annuler</button>
+                <button class="btn btn-primary" onclick="sauvegarderFichier()">Enregistrer 💾</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts requis pour le terminal en temps réel (Ajoutés proprement) -->
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+        let cheminActuel = "";
+        let fichierEnCoursDedition = "";
+
+        // ==========================================
+        // GESTION DU TERMINAL EN DIRECT (SOCKET.IO)
+        // ==========================================
+        const socket = io();
+        const term = new Terminal({
+            cursorBlink: true,
+            fontSize: 14,
+            fontFamily: 'Courier New, Courier, monospace',
+            theme: {
+                background: '#000000',
+                foreground: '#e0e0e0',
+                cursor: '#007acc'
+            }
+        });
+        
+        term.open(document.getElementById('terminal-container'));
+        term.write('Connexion à la console Fedora...\r\n');
+
+        // Envoyer la saisie clavier au serveur
+        term.onData(data => {
+            socket.emit('input', data);
+        });
+
+        // Afficher le retour du serveur à l'écran
+        socket.on('output', data => {
+            term.write(data);
+        });
+
+        // Ajuster automatiquement l'affichage
+        window.addEventListener('resize', () => {
+            // Optionnel : on peut configurer un addon de redimensionnement de xterm.js ici
+        });
+
+
+        // ==========================================
+        // GESTION DE L'EXPLORATEUR DE FICHIERS
+        // ==========================================
+
+        // Charger la liste des fichiers
+        async function chargerDossier(chemin = "") {
+            try {
+                const reponse = await fetch(`/api/fichiers?chemin=${encodeURIComponent(chemin)}`);
+                const donnees = await reponse.json();
+
+                if (donnees.succes) {
+                    cheminActuel = donnees.cheminActuel;
+                    document.getElementById('chemin-actuel').innerText = cheminActuel;
+                    document.getElementById('btn-retour').disabled = (cheminActuel === "/" || cheminActuel === "");
+
+                    const zone = document.getElementById('zone-fichiers');
+                    zone.innerHTML = "";
+
+                    donnees.fichiers.forEach(item => {
+                        if (item.nom.startsWith('.')) return; // Masquer les fichiers cachés
+
+                        const div = document.createElement('div');
+                        div.className = "item";
+                        
+                        const icone = item.estDossier ? "📁" : "📄";
+                        
+                        div.innerHTML = `
+                            <button class="delete-btn" title="Supprimer">&times;</button>
+                            <div class="icon">${icone}</div>
+                            <div class="name">${item.nom}</div>
+                        `;
+
+                        // Clic sur l'élément (dossier ou fichier)
+                        div.onclick = (e) => {
+                            // Si on clique sur le bouton supprimer, on ne déclenche pas l'ouverture
+                            if (e.target.classList.contains('delete-btn')) return;
+
+                            if (item.estDossier) {
+                                const nouveauChemin = cheminActuel === "/" ? `/${item.nom}` : `${cheminActuel}/${item.nom}`;
+                                chargerDossier(nouveauChemin);
+                            } else {
+                                ouvrirEditeur(item.nom);
+                            }
+                        };
+
+                        // Clic sur le bouton supprimer
+                        div.querySelector('.delete-btn').onclick = (e) => {
+                            e.stopPropagation();
+                            supprimerElement(item.nom, item.estDossier);
+                        };
+
+                        zone.appendChild(div);
+                    });
+                } else {
+                    alert("Erreur : " + donnees.erreur);
+                }
+            } catch (err) {
+                alert("Impossible de contacter le serveur.");
+            }
+        }
+
+        // Remonter au dossier parent
+        function remonter() {
+            if (cheminActuel === "/" || cheminActuel === "") return;
+            const parties = cheminActuel.split('/');
+            parties.pop();
+            const cheminParent = parties.join('/') || "/";
+            chargerDossier(cheminParent);
+        }
+
+        // Créer un fichier ou dossier
+        async function creerNouveau(type) {
+            const nom = prompt(`Nom du nouveau ${type} :`);
+            if (!nom) return;
+
+            const cheminComplet = cheminActuel === "/" ? `/${nom}` : `${cheminActuel}/${nom}`;
+            const url = type === 'fichier' ? '/api/fichier/creer' : '/api/dossier/creer';
+
+            try {
+                const reponse = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chemin: cheminComplet })
+                });
+                const res = await reponse.json();
+                if (res.succes) {
+                    chargerDossier(cheminActuel);
+                } else {
+                    alert("Impossible de créer l'élément : " + res.erreur);
+                }
+            } catch (err) {
+                alert("Erreur réseau.");
+            }
+        }
+
+        // Supprimer un fichier ou dossier
+        async function supprimerElement(nom, estDossier) {
+            if (!confirm(`Es-tu sûr de vouloir supprimer ${nom} ?`)) return;
+
+            const cheminComplet = cheminActuel === "/" ? `/${nom}` : `${cheminActuel}/${nom}`;
+
+            try {
+                const reponse = await fetch('/api/supprimer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chemin: cheminComplet, estDossier })
+                });
+                const res = await reponse.json();
+                if (res.succes) {
+                    chargerDossier(cheminActuel);
+                } else {
+                    alert("Erreur de suppression (si c'est un dossier, il doit être vide) : " + res.erreur);
+                }
+            } catch (err) {
+                alert("Erreur réseau.");
+            }
+        }
+
+        // --- GESTION DE L'ÉDITEUR ---
+
+        async function ouvrirEditeur(nomFichier) {
+            fichierEnCoursDedition = cheminActuel === "/" ? `/${nomFichier}` : `${cheminActuel}/${nomFichier}`;
+            document.getElementById('editeur-titre').innerText = `Édition de : ${nomFichier}`;
+
+            try {
+                const reponse = await fetch(`/api/fichier/lire?chemin=${encodeURIComponent(fichierEnCoursDedition)}`);
+                const res = await reponse.json();
+
+                if (res.succes) {
+                    document.getElementById('editeur-texte').value = res.contenu;
+                    document.getElementById('modal-editeur').style.display = 'flex';
+                } else {
+                    alert("Erreur de lecture du fichier : " + res.erreur);
+                }
+            } catch (err) {
+                alert("Impossible de lire le fichier.");
+            }
+        }
+
+        function fermerEditeur() {
+            document.getElementById('modal-editeur').style.display = 'none';
+            document.getElementById('editeur-texte').value = "";
+            fichierEnCoursDedition = "";
+        }
+
+        async function sauvegarderFichier() {
+            const contenu = document.getElementById('editeur-texte').value;
+
+            try {
+                const reponse = await fetch('/api/fichier/sauvegarder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chemin: fichierEnCoursDedition, contenu })
+                });
+                const res = await reponse.json();
+
+                if (res.succes) {
+                    alert("Fichier enregistré avec succès !");
+                    fermerEditeur();
+                    chargerDossier(cheminActuel);
+                } else {
+                    alert("Erreur de sauvegarde : " + res.erreur);
+                }
+            } catch (err) {
+                alert("Erreur de communication.");
+            }
+        }
+
+        // Démarrage
+        chargerDossier();
+    </script>
+</body>
+</html>
